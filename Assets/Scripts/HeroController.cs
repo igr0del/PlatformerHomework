@@ -2,6 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
+[RequireComponent (typeof(Rigidbody2D))]
+[RequireComponent (typeof(Collider2D))]
+
 public class HeroController : MonoBehaviour
 {
     [SerializeField] private float _speed = 5f;
@@ -12,7 +16,12 @@ public class HeroController : MonoBehaviour
     private SpriteRenderer _spriteRenderer;
     private Animator _animator;
 
+    private Vector3 _input;
+    private float _checkDistance = 0.3f;
     private bool _isGround = false;
+    private bool _isLeft = false;
+    private string _isRunning = "IsRunning";
+    private string _isJumping = "IsJumping";
 
     public static HeroController Instance { get; set; }
 
@@ -24,12 +33,6 @@ public class HeroController : MonoBehaviour
         Instance = this;
     }
 
-    private States State
-    {
-        get { return (States)_animator.GetInteger("state"); }
-        set { _animator.SetInteger("state", (int)value); }
-    }
-
     private void FixedUpdate()
     {
         CheckGround();    
@@ -37,23 +40,47 @@ public class HeroController : MonoBehaviour
 
     private void Update()
     {
-        if (_isGround) State = States.Idle;
-
         if (Input.GetButton("Horizontal"))
+        {
             Run();
+            _animator.SetBool(_isRunning, true);
+        }
+        else
+        {
+            _animator.SetBool(_isRunning, false);
+        }
+
         if (_isGround && Input.GetButton("Jump"))
+        {
             Jump();
+            _animator.SetBool(_isJumping, true);
+        }
+        else
+        {
+            _animator.SetBool(_isJumping, false);
+        }
     }
 
     private void Run()
     {
-        if (_isGround) State = States.Run;
+        float direction = Input.GetAxis("Horizontal");
+        _input = new Vector2(direction, 0);
 
-        Vector3 direction = transform.right * Input.GetAxis("Horizontal");
-        transform.position = Vector3.MoveTowards(transform.position, transform.position + direction, _speed * Time.deltaTime);
-        _spriteRenderer.flipX = direction.x < 0.0f;
+        transform.position += _input * _speed * Time.deltaTime;
+
+        if (_isLeft == true && direction > 0)
+            Flip();
+        else if (_isLeft == false && direction < 0)
+            Flip();
     }
 
+    private void Flip()
+    {
+        _isLeft = !_isLeft;
+        Vector3 Scaler = transform.localScale;
+        Scaler.x *= -1;
+        transform.localScale = Scaler;
+    }
     private void Jump()
     {
         _rigidbody.AddForce(transform.up * _jumpForce, ForceMode2D.Impulse); 
@@ -61,10 +88,8 @@ public class HeroController : MonoBehaviour
 
     private void CheckGround()
     {
-        Collider2D[] collider = Physics2D.OverlapCircleAll(transform.position, 0.3f);
+        Collider2D[] collider = Physics2D.OverlapCircleAll(transform.position, _checkDistance);
         _isGround = collider.Length > 1;
-
-        if (!_isGround) State = States.Jump; 
     }
 
     public void GetDamage()
@@ -72,12 +97,5 @@ public class HeroController : MonoBehaviour
 
         _lives -= 1;
         Debug.Log("Количество жизней - " + _lives);
-    }
-
-    public enum States
-    {
-        Idle,
-        Run,
-        Jump
     }
 }
